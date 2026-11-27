@@ -1,0 +1,27 @@
+// Panel web · configuración del Worker
+// Al publicar: Build command = npm run build · Deploy command = npx wrangler deploy
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ghostdev-panel",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-06-01",
+  "build": { "command": "npm run build" },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/agent"]
+  },
+  "keep_vars": true,
+  // OWNER_IDS, DISCORD_CLIENT_ID, DISCORD_PUBLIC_KEY y DISCORD_GUILD_ID se ponen en Cloudflare
+  // (Settings → Variables and Secrets) y se conservan en cada despliegue gracias a keep_vars.
+  // Los secretos (DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN) también van ahí, como «Secret». Nunca en este archivo.
+  "vars": {
+    "BRAND": "GhostDev Panel"
+  },
+  "d1_databases": [{ "binding": "DB", "database_name": "ghostdev-panel", "database_id": "7a2362cc-883f-406d-ad13-c6dee7de44af", "migrations_dir": "migrations" }],
+  "durable_objects": { "bindings": [{ "name": "HUB", "class_name": "ServerHub" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ServerHub"] }],
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
+  "observability": { "enabled": true }
+}
