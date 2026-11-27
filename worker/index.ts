@@ -113,7 +113,7 @@ async function serverList(env: Env, user: User) {
 async function api(req: Request, env: Env, path: string, ctx: ExecutionContext): Promise<Response> {
   if (path === '/api/auth/login') return login(req, env);
   if (path === '/api/auth/callback') return callback(req, env);
-  if (path === '/api/discord/interactions' && req.method === 'POST') return discordInteractions(req, env, ctx);
+  if (path === '/api/discord/interactions' && (req.method === 'POST' || req.method === 'GET')) return discordInteractions(req, env, ctx);
 
   if (path === '/api/brand') return json({ ok: true, brand: env.BRAND || 'Panel' });
   if (req.method !== 'GET' && !sameOrigin(req)) return fail('Origen no permitido.', 403);
@@ -271,7 +271,8 @@ async function api(req: Request, env: Env, path: string, ctx: ExecutionContext):
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
-    if (url.pathname === '/agent' || url.pathname.startsWith('/api/')) await ensureSchema(env);
+    if (url.pathname === '/api/discord/interactions') ctx.waitUntil(ensureSchema(env).catch(() => null));
+    else if (url.pathname === '/agent' || url.pathname.startsWith('/api/')) await ensureSchema(env);
     if (url.pathname === '/agent') return agent(req, env);
     if (url.pathname.startsWith('/api/')) {
       try {

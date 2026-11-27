@@ -10,11 +10,19 @@ async function verify(req: Request, body: string, publicKey: string) {
   const sig = req.headers.get('x-signature-ed25519');
   const ts = req.headers.get('x-signature-timestamp');
   if (!sig || !ts || !publicKey) return false;
+  const data = new TextEncoder().encode(ts + body);
   try {
     const key = await crypto.subtle.importKey('raw', hex(publicKey), { name: 'Ed25519' }, false, ['verify']);
-    return await crypto.subtle.verify('Ed25519', key, hex(sig), new TextEncoder().encode(ts + body));
+    return await crypto.subtle.verify('Ed25519', key, hex(sig), data);
   } catch {
-    return false;
+    // runtimes más antiguos solo conocen el nombre NODE-ED25519
+    try {
+      const algo = { name: 'NODE-ED25519', namedCurve: 'NODE-ED25519' } as unknown as { name: string };
+      const key = await crypto.subtle.importKey('raw', hex(publicKey), algo, false, ['verify']);
+      return await crypto.subtle.verify(algo, key, hex(sig), data);
+    } catch {
+      return false;
+    }
   }
 }
 
@@ -129,6 +137,11 @@ async function run(i: Interaction, env: Env) {
 }
 
 export async function discordInteractions(req: Request, env: Env, ctx: ExecutionContext) {
+  // comprobación rápida desde el navegador: dice si la clave pública está puesta (no la enseña)
+  if (req.method === 'GET') {
+    const k = (env.DISCORD_PUBLIC_KEY || '').trim();
+    return json({ ok: true, publicKey: /^[a-f0-9]{64}$/i.test(k) ? 'configurada' : k ? 'tiene un formato raro (deben ser 64 caracteres hex)' : 'FALTA DISCORD_PUBLIC_KEY', clientId: env.DISCORD_CLIENT_ID ? 'configurado' : 'falta', bot: env.DISCORD_BOT_TOKEN ? 'configurado' : 'falta' });
+  }
   const body = await req.text();
   if (!(await verify(req, body, (env.DISCORD_PUBLIC_KEY || '').trim()))) return new Response('firma no válida', { status: 401 });
   const i = JSON.parse(body) as Interaction;
